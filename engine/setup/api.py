@@ -30,6 +30,7 @@ RECOMMEND_MARGIN = 5 * 10 ** 9     # beyond what the install needs, so the disk 
 RECOMMEND_MARGIN_MAX = 20 * 10 ** 9
 MAX_BODY = 64 * 1024
 ACTIVE = ('waiting', 'downloading', 'verifying', 'unpacking', 'activating')
+AI_DISABLED = 'The bundled AI is disabled. Chat can use your existing local model server instead.'
 
 
 def _now():
@@ -338,6 +339,8 @@ class Setup:
         return None
 
     def ai_fit(self, hw):
+        if os.environ.get('LASTBOOK_LOCAL_AI') == '0':
+            return {'fits': False, 'needs_bytes': None, 'estimate': True, 'why': AI_DISABLED}
         m = self.manifest.model()
         if not m:
             return {'fits': False, 'needs_bytes': None, 'estimate': True, 'why': 'No local AI is offered for this version.'}
@@ -430,6 +433,8 @@ class Setup:
         return self.current.parent if self.current else self.default_parent
 
     def start(self, pack_id=None, ai=False, folder=None, sources=None, explicit=False, repair=False, map_id=None, address_id=None):
+        if ai and os.environ.get('LASTBOOK_LOCAL_AI') == '0':
+            return {'error': AI_DISABLED, 'code': 'disabled'}
         if repair:
             return self._start_repair(ai)
         with self.lock:
@@ -551,7 +556,7 @@ class Setup:
             pack = self.manifest.pack(cur['pack']) if cur['pack'] else None
             if not pack or not pack['available']:
                 return {'error': 'Lastbook cannot tell which library this is, so it cannot repair it. Download a library instead.', 'code': 'unavailable'}
-            model = self.manifest.model() if (ai or cur['model']) else None
+            model = self.manifest.model() if (ai or cur['model']) and os.environ.get('LASTBOOK_LOCAL_AI') != '0' else None
             parent, target = self.current.parent, self.current
             work = _work_for(target)
             srcs = {f['name']: f['path'] for f in self.found() if f.get('size_ok') and f['kind'] in ('pack', 'model')}

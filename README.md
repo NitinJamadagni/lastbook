@@ -92,6 +92,11 @@ The setup contract, including state maps, is in [docs/SETUP-API.md](docs/SETUP-A
 
 ## Run from source
 
+For a local macOS setup using an existing Ollama model instead of downloading Gemma,
+see [INSTRUCTIONS.md](INSTRUCTIONS.md). `bash run_local.sh` defaults to
+`qwen3.8:27b-mlx` on Ollama's loopback API and disables the bundled AI in setup.
+The upstream launch commands below retain their original defaults.
+
 You need Python 3.11 or later and a **data folder**. A data folder holds `library-data/catalog.json` (the library) and gets
 a `derived/` folder for indexes, caches and logs. Get one by running the app once and letting setup download a pack, or by
 unzipping a pack from lastbook.org.

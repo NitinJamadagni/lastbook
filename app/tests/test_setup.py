@@ -1251,6 +1251,40 @@ class ContentRevisions(Base):
 
 
 class Recommend(Base):
+    @mock.patch.dict(os.environ, {'LASTBOOK_LOCAL_AI': '0'})
+    def test_existing_model_server_disables_bundled_ai(self):
+        s = self.setup()
+        hw = self.hw(64 * 2 ** 30, 10 ** 12)
+        with mock.patch.object(s, '_model_path_here') as find_model:
+            hw['ai'] = s.ai_fit(hw)
+        find_model.assert_not_called()
+        self.assertFalse(hw['ai']['fits'])
+        self.assertIn('local model server', hw['ai']['why'])
+        with mock.patch.object(hardware, 'disk_of', return_value=(10 ** 12, 2 * 10 ** 12)):
+            recommendation = s.recommend(hw)
+        self.assertEqual(recommendation['pack'], 'small')
+        self.assertFalse(recommendation['ai'])
+        for repair in (False, True):
+            self.assertEqual(s.start('small', ai=True, repair=repair)['code'], 'disabled')
+        self.assertIsNone(s.job)
+        self.assertEqual(s.start('small', ai=False)['items'][0]['kind'], 'pack')
+        self.assertEqual(self.wait(s)['state'], 'done')
+        self.assertNotIn('model.gguf', [name for name, _, _ in self.files.log])
+
+    @mock.patch.dict(os.environ, {'LASTBOOK_LOCAL_AI': '0'})
+    def test_library_repair_does_not_repair_bundled_model(self):
+        cur = self.parent / 'LastbookData'
+        (cur / 'library-data').mkdir(parents=True)
+        (cur / 'library-data/catalog.json').write_text('{}')
+        (cur / 'pack.json').write_text('{"name": "small"}')
+        (cur / 'models').mkdir()
+        (cur / 'models/model.gguf').write_bytes(self.model)
+        s = self.setup('manage', current=cur)
+        with mock.patch.object(s, '_run'):
+            job = s.start(repair=True)
+        self.assertEqual([item['kind'] for item in job['items']], ['pack'])
+        self.assertIsNone(s.job['plan']['model'])
+
     def hw(self, ram, free, gpus=(), unified=True):
         return {'ram_bytes': ram, 'gpus': list(gpus), 'unified_memory': unified, 'disks': [{'path': str(self.parent), 'free_bytes': free, 'total_bytes': 10 ** 12}],
                 'ai': hardware.estimate_ai(ram, list(gpus), unified, 19_027_384_256)}
